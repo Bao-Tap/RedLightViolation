@@ -6,12 +6,12 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 
 
 # Config value
-video_path = "Video.mp4440.mp4"
+video_path = "Video.mp4439.mp4"
 conf_threshold = 0.3
 tracking_class = [2,3,5,7] # None: track all
 
 # Khởi tạo DeepSort
-tracker = DeepSort(max_age=5)
+tracker = DeepSort(max_age=20)
 
 model = YOLO('yolov8n.pt')
 

@@ -16,7 +16,7 @@ class VideoApp:
         self.root.title("Video Boundary Drawing")
 
         self.canvas_width = 1200
-        self.canvas_height = 600
+        self.canvas_height = 700
         self.canvas = tk.Canvas(root, width=self.canvas_width, height=self.canvas_height)
         self.canvas.pack()
 
@@ -54,7 +54,7 @@ class VideoApp:
         # Load models
         self.coco_model = YOLO('yolov8n.pt')
         self.license_plate_detector = YOLO('last.pt')
-        self.tracker = DeepSort(max_age=30)
+        self.tracker = DeepSort(max_age=15)
         self.vehicles_info = {}
 
         # Detection flag
@@ -150,7 +150,6 @@ class VideoApp:
     def detect_and_track(self, frame):
         vehicles = [2, 3, 5, 7]
         self.results[self.frame_nmr] = {}
-        display_frame = frame.copy()
         # Detect vehicles
         detections = self.coco_model(frame)[0]
         detections_ = []
@@ -192,8 +191,10 @@ class VideoApp:
                     if license_plate_text is not None:
                         if car_id not in self.vehicles_info:
                             self.vehicles_info[car_id] = {'license_plate': (license_plate_text, license_plate_text_score),
-                                                          'license_crop': license_plate_crop}
+                                                            'license_crop': license_plate_crop,
+                                                            "current_license_bbox": [x1,y1,x2,y2]}
                         else:
+                            self.vehicles_info[car_id]['current_license_bbox'] = [x1,y1,x2,y2]
                             _, current_score = self.vehicles_info[car_id]['license_plate']
                             if license_plate_text_score > current_score:
                                 self.vehicles_info[car_id]['license_plate'] = (license_plate_text, license_plate_text_score)
@@ -204,30 +205,44 @@ class VideoApp:
             x1, y1, x2, y2 = track.to_tlbr()
             car_id = track.track_id
 
-
             if car_id in self.vehicles_info and 'license_plate' in self.vehicles_info[car_id]:
                 license_plate_text, _ = self.vehicles_info[car_id]['license_plate']
                 license_plate_crop = self.vehicles_info[car_id]['license_crop']
+                license_bbox = self.vehicles_info[car_id].get('current_license_bbox', None)
                 if license_plate_text is not None:
-                    # Calculate the position to place the license plate crop
-                    H, W ,_= license_plate_crop.shape
-                    license_crop = cv2.resize(license_plate_crop, (W, H))
-                    # Ensure the region in frame matches the size of license_crop
-                    region_height = min(H, display_frame.shape[0] - int(y1))
-                    region_width = min(W, display_frame.shape[1] - int((x2 + x1 - W) / 2))
-                    
-                    if region_height > 0 and region_width > 0:
-                        # Place the license plate crop on the frame
-                        display_frame[int(y1):int(y1 + region_height), int((x2 + x1 - W) / 2):int((x2 + x1 + region_width) / 2), :] = license_crop[:region_height, :region_width]
-                        
+                    if license_bbox:
+                        # Use license plate bounding box
+                        lx1, ly1, lx2, ly2 = license_bbox
+                        H, W, _ = license_plate_crop.shape
 
-                    # Draw a white rectangle above the license plate for the text
-                    display_frame[int(y1) - int(H / 2):int(y1), int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = (255, 255, 255)
+                        if (
+                            0 <= int(ly1) - H < frame.shape[0] and
+                            0 <= int(ly1) < frame.shape[0] and
+                            0 <= int((lx2 + lx1 - W) / 2) < frame.shape[1] and
+                            0 <= int((lx2 + lx1 + W) / 2) < frame.shape[1]
+                        ):
+                            frame[int(ly1) - H:int(ly1), int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = license_plate_crop
+                            frame[int(ly1) - int(1.5 * H):int(ly1) - H, int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = (255, 255, 255)
 
-                    # Calculate the text size and position
-                    (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
-                    text_x = int((x2 + x1 - text_width) / 2)
-                    text_y = int(y1 - H / 8 - (text_height / 2))
+                        (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
+                        text_x = int((lx2 + lx1 - text_width) / 2)
+                        text_y = int(ly1 - H - H / 8 - (text_height / 2))
+                    else:
+                        # Use vehicle bounding box
+                        H, W, _ = license_plate_crop.shape
+
+                        if (
+                            0 <= int(y1) - H < frame.shape[0] and
+                            0 <= int(y1) < frame.shape[0] and
+                            0 <= int((x2 + x1 - W) / 2) < frame.shape[1] and
+                            0 <= int((x2 + x1 + W) / 2) < frame.shape[1]
+                        ):
+                            frame[int(y1) - H:int(y1), int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = license_plate_crop
+                            frame[int(y1) - int(1.5 * H):int(y1) - H, int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = (255, 255, 255)
+
+                        (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
+                        text_x = int((x2 + x1 - text_width) / 2)
+                        text_y = int(y1 - H - H / 8 - (text_height / 2))
 
                     # Put the text on the frame
                     cv2.putText(frame, license_plate_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 4)
@@ -244,7 +259,7 @@ class VideoApp:
                     cv2.putText(frame, "Red Light Violation", (int(x1), int(y2) + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
         # Display the frame with annotations
         # Display the frame with annotations
-        display_frame_resized = self.resize_frame(display_frame, self.canvas_width, self.canvas_height)
+        display_frame_resized = self.resize_frame(frame, self.canvas_width, self.canvas_height)
         display_frame_rgb = cv2.cvtColor(display_frame_resized, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(display_frame_rgb)
         imgtk = ImageTk.PhotoImage(image=img)

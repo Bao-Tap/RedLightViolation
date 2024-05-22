@@ -180,6 +180,24 @@ def read_license_plate(license_plate_crop):
         return format_license(cleaned_text), average_score
 
     return None, None
+def compute_iou(box1, box2):
+
+    # Determine the coordinates of the intersection rectangle
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    # Compute the area of intersection rectangle
+    intersection = max(0, x2 - x1 ) * max(0, y2 - y1)
+
+    # Compute the area of both bounding boxes
+    box1_area = (box1[2] - box1[0] ) * (box1[3] - box1[1] )
+    box2_area = (box2[2] - box2[0] ) * (box2[3] - box2[1] )
+
+    # Compute the Intersection over Union
+    iou = intersection / float(box1_area + box2_area - intersection)
+    return iou
 
 
 def get_car(license_plate, vehicle_track_ids):
@@ -195,16 +213,22 @@ def get_car(license_plate, vehicle_track_ids):
     """
     x1, y1, x2, y2, score, class_id = license_plate
 
-    foundIt = False
+    max_iou = 0
+    selected_vehicle = None
     for j in range(len(vehicle_track_ids)):
         xcar1, ycar1, xcar2, ycar2, car_id = vehicle_track_ids[j]
 
+        # Kiểm tra xem biển số xe có nằm trong bounding box của xe không
         if x1 > xcar1 and y1 > ycar1 and x2 < xcar2 and y2 < ycar2:
-            car_indx = j
-            foundIt = True
-            break
+            # Tính toán IoU giữa vùng chứa biển số xe và bounding box của xe
+            iou = compute_iou([x1, y1, x2, y2], [xcar1, ycar1, xcar2, ycar2])
+            
+            if iou > max_iou:
+                max_iou = iou
+                selected_vehicle = vehicle_track_ids[j]
 
-    if foundIt:
-        return vehicle_track_ids[car_indx]
+    if selected_vehicle is not None:
+        return selected_vehicle
 
     return -1, -1, -1, -1, -1
+
