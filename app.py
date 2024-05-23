@@ -169,9 +169,7 @@ class VideoApp:
             track_id.append((x1, y1, x2, y2, car_id))
 
             if car_id in self.vehicles_info:
-                self.vehicles_info[car_id][self.frame_nmr] = {
-                    'bbox': [x1, y1, x2, y2],
-                }
+                self.vehicles_info[car_id]["detect_license"] = False
 
         # Detect license plates
         license_plates = self.license_plate_detector(frame)[0]
@@ -192,14 +190,22 @@ class VideoApp:
                         if car_id not in self.vehicles_info:
                             self.vehicles_info[car_id] = {'license_plate': (license_plate_text, license_plate_text_score),
                                                             'license_crop': license_plate_crop,
-                                                            "current_license_bbox": [x1,y1,x2,y2]}
+                                                            "current_license_bbox": [x1,y1,x2,y2],
+                                                            "detect_license": True
+                                                        }
                         else:
                             self.vehicles_info[car_id]['current_license_bbox'] = [x1,y1,x2,y2]
+                            self.vehicles_info[car_id]['detect_license'] = True
                             _, current_score = self.vehicles_info[car_id]['license_plate']
                             if license_plate_text_score > current_score:
                                 self.vehicles_info[car_id]['license_plate'] = (license_plate_text, license_plate_text_score)
                                 self.vehicles_info[car_id]['license_crop'] = license_plate_crop
-
+                    else:
+                        if car_id not in self.vehicles_info:
+                            continue
+                        else: 
+                            self.vehicles_info[car_id]['detect_license'] = True
+                            self.vehicles_info[car_id]['current_license_bbox'] = [x1,y1,x2,y2]
         # Check for red light violation and display results
         for track in track_ids:
             x1, y1, x2, y2 = track.to_tlbr()
@@ -209,43 +215,45 @@ class VideoApp:
                 license_plate_text, _ = self.vehicles_info[car_id]['license_plate']
                 license_plate_crop = self.vehicles_info[car_id]['license_crop']
                 license_bbox = self.vehicles_info[car_id].get('current_license_bbox', None)
-                if license_plate_text is not None:
-                    if license_bbox:
-                        # Use license plate bounding box
-                        lx1, ly1, lx2, ly2 = license_bbox
-                        H, W, _ = license_plate_crop.shape
+                license_detect = self.vehicles_info[car_id]['detect_license']
+                if license_detect:
+                    if license_plate_text is not None:
+                        if license_bbox:
+                            # Use license plate bounding box
+                            lx1, ly1, lx2, ly2 = license_bbox
+                            H, W, _ = license_plate_crop.shape
 
-                        if (
-                            0 <= int(ly1) - H < frame.shape[0] and
-                            0 <= int(ly1) < frame.shape[0] and
-                            0 <= int((lx2 + lx1 - W) / 2) < frame.shape[1] and
-                            0 <= int((lx2 + lx1 + W) / 2) < frame.shape[1]
-                        ):
-                            frame[int(ly1) - H:int(ly1), int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = license_plate_crop
-                            frame[int(ly1) - int(1.5 * H):int(ly1) - H, int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = (255, 255, 255)
+                            if (
+                                0 <= int(ly1) - H < frame.shape[0] and
+                                0 <= int(ly1) < frame.shape[0] and
+                                0 <= int((lx2 + lx1 - W) / 2) < frame.shape[1] and
+                                0 <= int((lx2 + lx1 + W) / 2) < frame.shape[1]
+                            ):
+                                frame[int(ly1) - H:int(ly1), int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = license_plate_crop
+                                frame[int(ly1) - int(1.5 * H):int(ly1) - H, int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = (255, 255, 255)
 
-                        (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
-                        text_x = int((lx2 + lx1 - text_width) / 2)
-                        text_y = int(ly1 - H - H / 8 - (text_height / 2))
-                    else:
-                        # Use vehicle bounding box
-                        H, W, _ = license_plate_crop.shape
+                            (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
+                            text_x = int((lx2 + lx1 - text_width) / 2)
+                            text_y = int(ly1 - H - H / 8 - (text_height / 2))
+                        else:
+                            # Use vehicle bounding box
+                            H, W, _ = license_plate_crop.shape
 
-                        if (
-                            0 <= int(y1) - H < frame.shape[0] and
-                            0 <= int(y1) < frame.shape[0] and
-                            0 <= int((x2 + x1 - W) / 2) < frame.shape[1] and
-                            0 <= int((x2 + x1 + W) / 2) < frame.shape[1]
-                        ):
-                            frame[int(y1) - H:int(y1), int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = license_plate_crop
-                            frame[int(y1) - int(1.5 * H):int(y1) - H, int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = (255, 255, 255)
+                            if (
+                                0 <= int(y1) - H < frame.shape[0] and
+                                0 <= int(y1) < frame.shape[0] and
+                                0 <= int((x2 + x1 - W) / 2) < frame.shape[1] and
+                                0 <= int((x2 + x1 + W) / 2) < frame.shape[1]
+                            ):
+                                frame[int(y1) - H:int(y1), int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = license_plate_crop
+                                frame[int(y1) - int(1.5 * H):int(y1) - H, int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = (255, 255, 255)
 
-                        (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
-                        text_x = int((x2 + x1 - text_width) / 2)
-                        text_y = int(y1 - H - H / 8 - (text_height / 2))
+                            (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
+                            text_x = int((x2 + x1 - text_width) / 2)
+                            text_y = int(y1 - H - H / 8 - (text_height / 2))
 
-                    # Put the text on the frame
-                    cv2.putText(frame, license_plate_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 4)
+                        # Put the text on the frame
+                        cv2.putText(frame, license_plate_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 4)
 
         # Check if the car crosses the left boundary line (red light violation)
         if self.left_coords and self.right_coords:
