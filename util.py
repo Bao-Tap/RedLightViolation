@@ -231,4 +231,21 @@ def get_car(license_plate, vehicle_track_ids):
         return selected_vehicle
 
     return -1, -1, -1, -1, -1
+def draw_border(img, top_left, bottom_right, color=(0, 255, 0), thickness=1, line_length_x=20, line_length_y=20):
+    x1, y1 = top_left
+    x2, y2 = bottom_right
+
+    cv2.line(img, (x1, y1), (x1, y1 + line_length_y), color, thickness)  #-- top-left
+    cv2.line(img, (x1, y1), (x1 + line_length_x, y1), color, thickness)
+
+    cv2.line(img, (x1, y2), (x1, y2 - line_length_y), color, thickness)  #-- bottom-left
+    cv2.line(img, (x1, y2), (x1 + line_length_x, y2), color, thickness)
+
+    cv2.line(img, (x2, y1), (x2 - line_length_x, y1), color, thickness)  #-- top-right
+    cv2.line(img, (x2, y1), (x2, y1 + line_length_y), color, thickness)
+
+    cv2.line(img, (x2, y2), (x2, y2 - line_length_y), color, thickness)  #-- bottom-right
+    cv2.line(img, (x2, y2), (x2 - line_length_x, y2), color, thickness)
+
+    return img
 
