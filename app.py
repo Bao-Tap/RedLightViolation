@@ -15,9 +15,12 @@ class TrafficViolationApp:
     def __init__(self, root):
         self.root = root
 
-        # Tạo frame cho danh sách vi phạm
         self.violations_frame = ttk.LabelFrame(root, text="Detected Violations")
         self.violations_frame.grid(row=0, column=1, pady=10, sticky="nsew")
+
+        # Cấu hình lưới bên trong violations_frame
+        self.violations_frame.grid_rowconfigure(0, weight=1)
+        self.violations_frame.grid_columnconfigure(0, weight=1)
 
         # Tạo treeview để hiển thị danh sách vi phạm
         self.tree = ttk.Treeview(self.violations_frame, columns=("ID", "License Plate", "Time"), show="headings")
@@ -26,46 +29,47 @@ class TrafficViolationApp:
         self.tree.heading("Time", text="Time")
         self.tree.grid(row=0, column=0, sticky="nsew")
 
+        # Thêm scrollbar cho treeview
+        self.scrollbar = ttk.Scrollbar(self.violations_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscroll=self.scrollbar.set)
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+
         # Tạo frame cho chi tiết vi phạm
         self.details_frame = ttk.LabelFrame(root, text="Violation Details")
         self.details_frame.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
-
+        self.details_frame.grid_rowconfigure(0, weight=1)
         # Tạo canvas để hiển thị hình ảnh biển số và đèn tín hiệu giao thông
         self.license_plate_canvas = tk.Canvas(self.details_frame, width=200, height=100)
         self.license_plate_canvas.grid(row=0, column=0, padx=10, pady=10)
-        self.red_light_canvas = tk.Canvas(self.details_frame, width=200, height=100)
+        self.red_light_canvas = tk.Canvas(self.details_frame, width=100, height=200)
         self.red_light_canvas.grid(row=0, column=1, padx=10, pady=10)
+        self.car_canvas = tk.Canvas(self.details_frame, width=200, height=200)
+        self.car_canvas.grid(row=0, column=2, padx=10, pady=10)
 
         # Tạo label để hiển thị biển số
-        self.license_plate_label = ttk.Label(self.details_frame, text="License Plate:")
+        self.license_plate_label = ttk.Label(self.details_frame, text="License Plate:", font=("Helvetica", 12, "bold"))
         self.license_plate_label.grid(row=1, column=0, padx=10, pady=10)
 
-        self.license_plate_text = ttk.Label(self.details_frame, text="")
+        self.license_plate_text = ttk.Label(self.details_frame, text="", font=("Helvetica", 12, "bold"))
         self.license_plate_text.grid(row=1, column=1, padx=10, pady=10)
 
+        # Ràng buộc sự kiện chọn hàng trên treeview
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 
-    def add_violation(self, car_id, license_plate_text, license_plate_image_path, red_light_image_path, time):
+    def add_violation(self, car_id, license_plate_text, license_plate_image_path, red_light_image_path,car_image_path, time):
         self.tree.insert("", "end", values=(car_id, license_plate_text, time))
-        self.select_latest_violation()
-    def select_latest_violation(self):
-        # Lấy tất cả các mục trong treeview
-        items = self.tree.get_children()
-        if items:
-            # Chọn mục cuối cùng
-            latest_item = items[-1]
-            self.tree.selection_set(latest_item)
-            self.on_tree_select(None)  # Gọi phương thức để cập nhật chi tiết
+
 
     def on_tree_select(self, event):
         try:
             selected_item = self.tree.selection()[0]
             values = self.tree.item(selected_item, "values")
-            print(f"Selected values: {values}")  # In ra giá trị được chọn để kiểm tra
 
             car_id = values[0]
             license_plate_text = values[1]
             license_plate_image_path = f"violations/{car_id}_license_plate.png"
             red_light_image_path = f"violations/{car_id}_red_light.png"
+            car_image_path= f"violations/{car_id}_car.png"
 
             # Kiểm tra sự tồn tại của các tệp hình ảnh
             if not os.path.exists(license_plate_image_path):
@@ -73,6 +77,9 @@ class TrafficViolationApp:
                 return
             if not os.path.exists(red_light_image_path):
                 print(f"Red light image not found: {red_light_image_path}")
+                return
+            if not os.path.exists(car_image_path):
+                print(f"car image not found: {car_image_path}")
                 return
 
             # Hiển thị hình ảnh biển số
@@ -83,9 +90,14 @@ class TrafficViolationApp:
 
             # Hiển thị hình ảnh đèn tín hiệu giao thông
             red_light_image = Image.open(red_light_image_path)
-            red_light_image = red_light_image.resize((200, 100))
+            red_light_image = red_light_image.resize((100, 200))
             self.red_light_photo = ImageTk.PhotoImage(red_light_image)
             self.red_light_canvas.create_image(0, 0, anchor="nw", image=self.red_light_photo)
+
+            car_image = Image.open(car_image_path)
+            car_image = car_image.resize((200, 200))
+            self.car_photo = ImageTk.PhotoImage(car_image)
+            self.car_canvas.create_image(0, 0, anchor="nw", image=self.car_photo)
 
             # Hiển thị biển số
             self.license_plate_text.config(text=license_plate_text)
@@ -100,17 +112,14 @@ class VideoApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Video Boundary Drawing")
-        root.grid_columnconfigure(0, weight=3)
-
 
         # Tạo frame cho video
         self.video_frame = ttk.Frame(root)
-        self.video_frame.grid(row=0, column=0, rowspan=2)
-
-        self.canvas_width = 1200
+        self.video_frame.grid(row=0, column=0, rowspan=2,sticky="nsew")
+        self.canvas_width = 900
         self.canvas_height = 700
         self.canvas = tk.Canvas(self.video_frame, width=self.canvas_width, height=self.canvas_height)
-        self.canvas.pack()
+        self.canvas.pack(expand=True, fill="both")
 
         self.btn_open = tk.Button(self.video_frame, text="Open Video", command=self.open_video)
         self.btn_open.pack(side=tk.LEFT)
@@ -125,7 +134,7 @@ class VideoApp:
         self.btn_detect_red_light.pack(side=tk.LEFT)
 
         # Labels to display boundary coordinates
-        self.left_coords_label = tk.Label(self.video_frame, text="Left line coordinates: None")
+        self.left_coords_label = tk.Label(self.video_frame, text="Line coordinates: None")
         self.left_coords_label.pack(side=tk.LEFT)
         self.right_coords_label = tk.Label(self.video_frame, text="Right line coordinates: None")
         self.right_coords_label.pack(side=tk.LEFT)
@@ -156,7 +165,7 @@ class VideoApp:
 
         # Detection flag
         self.detect_red_light = False
-
+        self.list_violation=set()
         # Results storage
         self.results = {}
         self.frame_nmr = -1
@@ -187,7 +196,7 @@ class VideoApp:
 
             self.root.after(200, self.show_frame)
 
-    def save_violation_info(self, car_id, license_plate_crop, red_light_bbox, license_plate_text):
+    def save_violation_info(self, car_id, license_plate_crop, red_light_bbox, license_plate_text, car_bbox):
         # Tạo thư mục violations nếu chưa tồn tại
         if not os.path.exists("violations"):
             os.makedirs("violations")
@@ -201,14 +210,19 @@ class VideoApp:
         red_light_image_path = f"violations/{car_id}_red_light.png"
         cv2.imwrite(red_light_image_path, red_light_image)
 
+        car_image = self.frame[int(car_bbox[1]-100 if car_bbox[1]>100 else 0 ):int(car_bbox[3]+100 if car_bbox[3]+100 < self.frame.shape[0] else self.frame.shape[0]), 
+                               int(car_bbox[0]-100 if car_bbox[0]>100 else 0 ):int(car_bbox[2]+100 if car_bbox[2]+100 < self.frame.shape[1] else self.frame.shape[1])]
+        car_image_path = f"violations/{car_id}_car.png"
+        cv2.imwrite(car_image_path, car_image)
+
         # Lưu thông tin vào file CSV
         with open("violations/violations.csv", mode="a", newline="") as file:
             writer = csv.writer(file)
             violation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            writer.writerow([car_id, license_plate_text, license_plate_image_path, red_light_image_path, violation_time])
+            writer.writerow([car_id, license_plate_text, license_plate_image_path, red_light_image_path,car_image_path, violation_time])
 
         # Thêm thông tin vào giao diện Tkinter
-        self.app.add_violation(car_id, license_plate_text, license_plate_image_path, red_light_image_path, violation_time)
+        self.app.add_violation(car_id, license_plate_text, license_plate_image_path, red_light_image_path, car_image_path,violation_time)
     def resize_frame(self, frame, width, height):
         h, w, _ = frame.shape
         scale = min(width / w, height / h)
@@ -251,7 +265,7 @@ class VideoApp:
                 self.canvas.delete(self.left_line)
             self.left_line = self.canvas.create_line(self.point1[0], self.point1[1], self.point2[0], self.point2[1], fill="green", width=2)
             self.left_coords = (scaled_point1, scaled_point2)
-            self.left_coords_label.config(text=f"Left line coordinates: {self.left_coords}")
+            self.left_coords_label.config(text=f"Line coordinates: {self.left_coords}")
         elif self.current_line == "right":
             if self.right_line:
                 self.canvas.delete(self.right_line)
@@ -379,7 +393,9 @@ class VideoApp:
                             color=(0, 255, 0)       
                             self.vehicles_info[car_id]['violation']=False
                         if self.vehicles_info[car_id]['violation']:
-                            self.save_violation_info(car_id, license_plate_crop, self.red_light_bbox, license_plate_text)
+                            if car_id not in self.list_violation:
+                                self.save_violation_info(car_id, license_plate_crop, self.red_light_bbox, license_plate_text, (x1,y1,x2,y2))
+                                self.list_violation.add(car_id)
                             color = (0, 0, 255)
                                                    
                         draw_border(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 4,
@@ -432,5 +448,10 @@ class VideoApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    root.grid_columnconfigure(0, weight=5)
+    root.grid_columnconfigure(1, weight=1)
+    root.grid_rowconfigure(0, weight=5)
+    root.grid_rowconfigure(1, weight=1)
+
     app = VideoApp(root)
     root.mainloop()
