@@ -47,10 +47,10 @@ class TrafficViolationApp:
         self.car_canvas.grid(row=0, column=2, padx=10, pady=10)
 
         # Tạo label để hiển thị biển số
-        self.license_plate_label = ttk.Label(self.details_frame, text="License Plate:", font=("Helvetica", 12, "bold"))
+        self.license_plate_label = ttk.Label(self.details_frame, text="License Plate:", font=("Helvetica", 15, "bold"))
         self.license_plate_label.grid(row=1, column=0, padx=10, pady=10)
 
-        self.license_plate_text = ttk.Label(self.details_frame, text="", font=("Helvetica", 12, "bold"))
+        self.license_plate_text = ttk.Label(self.details_frame, text="", font=("Helvetica", 15, "bold"))
         self.license_plate_text.grid(row=1, column=1, padx=10, pady=10)
 
         # Ràng buộc sự kiện chọn hàng trên treeview
@@ -111,11 +111,11 @@ class TrafficViolationApp:
 class VideoApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Video Boundary Drawing")
+        self.root.title("Traffic Light Violation Alert")
 
         # Tạo frame cho video
         self.video_frame = ttk.Frame(root)
-        self.video_frame.grid(row=0, column=0, rowspan=2,sticky="nsew")
+        self.video_frame.grid(row=0, column=0, rowspan=2, sticky="nsew")
         self.canvas_width = 900
         self.canvas_height = 700
         self.canvas = tk.Canvas(self.video_frame, width=self.canvas_width, height=self.canvas_height)
@@ -129,6 +129,7 @@ class VideoApp:
 
         self.btn_draw_right = tk.Button(self.video_frame, text="Draw Right Boundary", command=self.draw_right_boundary)
         self.btn_draw_right.pack(side=tk.LEFT)
+        self.btn_draw_right.config(state=tk.DISABLED)  # Ban đầu nút này bị vô hiệu hóa
 
         self.btn_detect_red_light = tk.Button(self.video_frame, text="Detect Red Light Violation", command=self.toggle_red_light_detection)
         self.btn_detect_red_light.pack(side=tk.LEFT)
@@ -136,8 +137,11 @@ class VideoApp:
         # Labels to display boundary coordinates
         self.left_coords_label = tk.Label(self.video_frame, text="Line coordinates: None")
         self.left_coords_label.pack(side=tk.LEFT)
-        self.right_coords_label = tk.Label(self.video_frame, text="Right line coordinates: None")
-        self.right_coords_label.pack(side=tk.LEFT)
+        
+        # Right line button
+        self.right_coords_btn = tk.Button(self.video_frame, text="Allow Right Turn?", command=self.enable_right_draw)
+        self.right_coords_btn.pack(side=tk.LEFT)
+        self.right_draw_enabled = False
 
         self.cap = None
         self.frame = None
@@ -165,7 +169,7 @@ class VideoApp:
 
         # Detection flag
         self.detect_red_light = False
-        self.list_violation=set()
+        self.list_violation = set()
         # Results storage
         self.results = {}
         self.frame_nmr = -1
@@ -210,8 +214,8 @@ class VideoApp:
         red_light_image_path = f"violations/{car_id}_red_light.png"
         cv2.imwrite(red_light_image_path, red_light_image)
 
-        car_image = self.frame[int(car_bbox[1]-100 if car_bbox[1]>100 else 0 ):int(car_bbox[3]+100 if car_bbox[3]+100 < self.frame.shape[0] else self.frame.shape[0]), 
-                               int(car_bbox[0]-100 if car_bbox[0]>100 else 0 ):int(car_bbox[2]+100 if car_bbox[2]+100 < self.frame.shape[1] else self.frame.shape[1])]
+        car_image = self.frame[int(car_bbox[1]-100 if car_bbox[1]>100 else 0):int(car_bbox[3]+100 if car_bbox[3]+100 < self.frame.shape[0] else self.frame.shape[0]), 
+                               int(car_bbox[0]-100 if car_bbox[0]>100 else 0):int(car_bbox[2]+100 if car_bbox[2]+100 < self.frame.shape[1] else self.frame.shape[1])]
         car_image_path = f"violations/{car_id}_car.png"
         cv2.imwrite(car_image_path, car_image)
 
@@ -219,10 +223,32 @@ class VideoApp:
         with open("violations/violations.csv", mode="a", newline="") as file:
             writer = csv.writer(file)
             violation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            writer.writerow([car_id, license_plate_text, license_plate_image_path, red_light_image_path,car_image_path, violation_time])
+            writer.writerow([car_id, license_plate_text, license_plate_image_path, red_light_image_path, car_image_path, violation_time])
 
         # Thêm thông tin vào giao diện Tkinter
-        self.app.add_violation(car_id, license_plate_text, license_plate_image_path, red_light_image_path, car_image_path,violation_time)
+        self.app.add_violation(car_id, license_plate_text, license_plate_image_path, red_light_image_path, car_image_path, violation_time)
+
+    def remove_violation(self, car_id):
+        
+        if car_id in self.list_violation:
+            self.list_violation.remove(car_id)
+        
+        # Xóa thông tin khỏi Treeview
+        for item in self.app.tree.get_children():
+            if self.app.tree.item(item, "values")[0] == str(car_id):
+                self.app.tree.delete(item)
+                break
+        
+        # Xóa thông tin khỏi file CSV
+        temp_file = "violations/temp_violations.csv"
+        with open("violations/violations.csv", mode="r", newline="") as infile, open(temp_file, mode="w", newline="") as outfile:
+            reader = csv.reader(infile)
+            writer = csv.writer(outfile)
+            for row in reader:
+                if row[0] != str(car_id):
+                    writer.writerow(row)
+        os.replace(temp_file, "violations/violations.csv")
+    
     def resize_frame(self, frame, width, height):
         h, w, _ = frame.shape
         scale = min(width / w, height / h)
@@ -245,6 +271,15 @@ class VideoApp:
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
 
+    def enable_right_draw(self):
+        if self.right_draw_enabled:
+            self.btn_draw_right.config(state=tk.DISABLED)
+            self.right_coords_btn.config(text="Allow Right Turn?")
+        else:
+            self.btn_draw_right.config(state=tk.NORMAL)
+            self.right_coords_btn.config(text="Disable Right Turn")
+        self.right_draw_enabled = not self.right_draw_enabled
+
     def on_click(self, event):
         self.point1 = (event.x, event.y)
         self.drawing = True
@@ -263,21 +298,22 @@ class VideoApp:
         if self.current_line == "left":
             if self.left_line:
                 self.canvas.delete(self.left_line)
-            self.left_line = self.canvas.create_line(self.point1[0], self.point1[1], self.point2[0], self.point2[1], fill="green", width=2)
+            self.left_line = self.canvas.create_line(self.point1[0], self.point1[1], self.point2[0], self.point2[1], fill="red", width=2)
             self.left_coords = (scaled_point1, scaled_point2)
             self.left_coords_label.config(text=f"Line coordinates: {self.left_coords}")
         elif self.current_line == "right":
             if self.right_line:
                 self.canvas.delete(self.right_line)
-            self.right_line = self.canvas.create_line(self.point1[0], self.point1[1], self.point2[0], self.point2[1], fill="blue", width=2)
+            self.right_line = self.canvas.create_line(self.point1[0], self.point1[1], self.point2[0], self.point2[1], fill="green", width=2)
             self.right_coords = (scaled_point1, scaled_point2)
-            self.right_coords_label.config(text=f"Right line coordinates: {self.right_coords}")
+            self.right_coords_btn.config(text=f"Right line coordinates: {self.right_coords}")
         self.canvas.delete("preview_line")
 
     def toggle_red_light_detection(self):
         self.detect_red_light = not self.detect_red_light
         if self.detect_red_light:
             self.btn_detect_red_light.config(text="Stop Red Light Detection")
+
         else:
             self.btn_detect_red_light.config(text="Detect Red Light Violation")
 
@@ -357,9 +393,10 @@ class VideoApp:
             self.red_light_counter += 1
             if self.red_light_counter >= self.red_light_threshold:
                 self.red_light_detected = False
-        if self.left_coords and self.right_coords:
+        if self.left_coords :
             left_line_x1, left_line_y1 = self.left_coords[0]
             left_line_x2, left_line_y2 = self.left_coords[1]
+        if  self.right_coords and self.right_draw_enabled:
             right_line_x1, right_line_y1 = self.right_coords[0]
             right_line_x2, right_line_y2 = self.right_coords[1]
         # Check for red light violation and display results
@@ -389,9 +426,13 @@ class VideoApp:
                                 if self.red_light_detected:
                                     self.vehicles_info[car_id]['violation'] = True
 
-                        if x2 > right_line_x1 and x2 > right_line_x2 and self.vehicles_info[car_id]['violation']==True:
-                            color=(0, 255, 0)       
-                            self.vehicles_info[car_id]['violation']=False
+                        if self.right_coords and self.right_draw_enabled:
+                            if x2 > right_line_x1 and x2 > right_line_x2 and self.vehicles_info[car_id]['violation']==True:
+                                color=(0, 255, 0)       
+                                self.vehicles_info[car_id]['violation']=False
+                                if car_id in self.list_violation:
+                                    self.remove_violation(car_id)
+
                         if self.vehicles_info[car_id]['violation']:
                             if car_id not in self.list_violation:
                                 self.save_violation_info(car_id, license_plate_crop, self.red_light_bbox, license_plate_text, (x1,y1,x2,y2))
