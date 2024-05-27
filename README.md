@@ -39,10 +39,9 @@ This project is an automatic system for detecting vehicles violating red light s
 ## Results
 
 Below are some sample results from the program:
-
-![Result 1](path/to/your/image1.png)
-![Result 2](path/to/your/image2.png)
-![Result 3](path/to/your/image3.png)
+![rs2](https://github.com/lebatuanphong5398/RedLightViolation/assets/133201252/90f2c190-4c49-48d5-b1a3-e248d0f7362f)
+![rs3](https://github.com/lebatuanphong5398/RedLightViolation/assets/133201252/9316356c-ab7c-4838-876e-09ce55de564a)
+![rs1](https://github.com/lebatuanphong5398/RedLightViolation/assets/133201252/8e28194f-11dc-4b1a-9599-163a02702321)
 
 ## Contributing
 
