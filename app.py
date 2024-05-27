@@ -198,7 +198,7 @@ class VideoApp:
                 self.frame_nmr += 1
                 self.detect_and_track(self.frame)
 
-            self.root.after(200, self.show_frame)
+            self.root.after(100, self.show_frame)
 
     def save_violation_info(self, car_id, license_plate_crop, red_light_bbox, license_plate_text, car_bbox):
         # Tạo thư mục violations nếu chưa tồn tại
