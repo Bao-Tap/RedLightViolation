@@ -15,7 +15,7 @@ This project is an automatic system for detecting vehicles violating red light s
 1. **Clone the repository:**
 
     ```bash
-    git clone https://github.com/lebatuanphong5398/RedLightViolation.git
+    git clone https://github.com/Bao-Tap/RedLightViolation.git
     cd RedLightViolation
     ```
 
