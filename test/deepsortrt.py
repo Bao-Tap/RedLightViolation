@@ -6,16 +6,16 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 
 
 # Config value
-video_path = "Video.mp4344.mp4"
+video_path = "D:/phong/video/Video.mp41143.mp4"
 conf_threshold = 0.3
 tracking_class = [2,3,5,7] # None: track all
 
 # Khởi tạo DeepSort
 tracker = DeepSort(max_age=15)
 
-model = YOLO('yolov8n.pt')
+model = YOLO('lastict.pt')
 
-class_names = ["","","CAR","moto","","bus","","truck"]
+class_names = ["plate","red","CAR"]
 
 colors = np.random.randint(0,255, size=(10,3 ))
 print(colors)

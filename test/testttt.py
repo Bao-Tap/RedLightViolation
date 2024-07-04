@@ -3,18 +3,16 @@ import cv2
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 from deep_sort_realtime.deepsort_tracker import DeepSort
-from util import *
+# from util import *
 
 
 results = {}
 
-# load models
-coco_model = YOLO('yolov8n.pt')
-license_plate_detector = YOLO('last.pt')
+license_plate_detector = YOLO('lastict.pt')
 
 
 vehicles_info = {}
-cap = cv2.VideoCapture('Video.mp4440.mp4')
+cap = cv2.VideoCapture('D:/phong/video/Video.mp41188.mp4')
 
 vehicles = [2, 3, 5, 7]
 tracker = DeepSort(max_age=30)
@@ -56,17 +54,19 @@ while ret:
         #         }
 
         # detect license plates
-        license_plates = coco_model(frame)[0]
+        license_plates = license_plate_detector(frame)[0]
         for license_plate in license_plates.boxes.data.tolist():
             x1, y1, x2, y2, score, class_id = license_plate
-            if int(class_id) != 3:
+            if int(class_id) == 2:
                 # Vẽ hình chữ nhật xung quanh đèn đỏ
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
-                cv2.putText(frame, 'Red Light', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
-            else:
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-                cv2.putText(frame, 'plate', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-
+                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 4)
+                cv2.putText(frame, 'car', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 4)
+            elif int(class_id) == 0:
+                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 4)
+                cv2.putText(frame, 'plate', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 4)
+            # else:
+            #     cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+            #     cv2.putText(frame, 'red', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2) 
         # Hiển thị khung hình
         frame=cv2.resize(frame, (1200,700))
         cv2.imshow('Frame', frame)

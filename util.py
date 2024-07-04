@@ -108,7 +108,7 @@ def license_complies_format(text):
     Returns:
         bool: True if the license plate complies with the format, False otherwise.
     """
-    if len(text) <8:
+    if len(text) <7:
         return False
 
     # if (text[0] in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] or text[0] in dict_char_to_int.keys()) and \

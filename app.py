@@ -162,8 +162,7 @@ class VideoApp:
         self.red_light_bbox = (0, 0, 0, 0)
 
         # Load models
-        self.coco_model = YOLO('yolov8n.pt')
-        self.license_plate_detector = YOLO('last.pt')
+        self.license_plate_detector = YOLO('lastict.pt')
         self.tracker = DeepSort(max_age=15)
         self.vehicles_info = {}
 
@@ -318,16 +317,15 @@ class VideoApp:
             self.btn_detect_red_light.config(text="Detect Red Light Violation")
 
     def detect_and_track(self, frame):
-        vehicles = [2, 3, 5, 7]
         self.results[self.frame_nmr] = {}
         # Detect vehicles
         red_light_detected_in_frame=False
-        detections = self.coco_model(frame)[0]
+        detections = self.license_plate_detector(frame)[0]
         detections_ = []
         for detection in detections.boxes.data.tolist():
             x1, y1, x2, y2, score, class_id = detection
             x1, y1, x2, y2 = map(int, (x1, y1, x2, y2))
-            if int(class_id) in vehicles:
+            if int(class_id) == 2:
                 detections_.append([[x1, y1, x2-x1, y2-y1], score, int(class_id)])
 
         # Track vehicles
@@ -343,12 +341,12 @@ class VideoApp:
                 self.vehicles_info[car_id]["detect_license"] = False
 
         # Detect license plates
-        license_plates = self.license_plate_detector(frame)[0]
+        # license_plates = self.license_plate_detector(frame)[0]
 
-        for license_plate in license_plates.boxes.data.tolist():
+        for license_plate in detections.boxes.data.tolist():
             x1, y1, x2, y2, score, class_id = license_plate
             if int(class_id) == 0:
-                xcar1, ycar1, xcar2, ycar2, car_id = get_car(license_plate, track_id)
+                _, _, _, _, car_id = get_car(license_plate, track_id)
                 if car_id != -1:
                     license_plate_crop = frame[int(y1):int(y2), int(x1):int(x2), :]
                     license_plate_crop_gray = cv2.cvtColor(license_plate_crop, cv2.COLOR_BGR2GRAY)
@@ -367,7 +365,6 @@ class VideoApp:
                                                             "violation": False,
                                                             "crossed_stop_line": False,  # Xe đã vượt qua vạch dừng
                                                             "direction": None,  # Hướng di chuyển của xe
-                                                            "light": False  # qua vạch dừng trong lúc đèn?
                                                         }
                         else:
                             self.vehicles_info[car_id]['current_license_bbox'] = [x1,y1,x2,y2]
@@ -385,7 +382,7 @@ class VideoApp:
             elif int(class_id) == 1:  # Red light
                 red_light_detected_in_frame = True
                 self.red_light_bbox = (x1, y1, x2, y2)
-            # Cập nhật trạng thái đèn đỏ
+        # Cập nhật trạng thái đèn đỏ 
         if red_light_detected_in_frame:
             self.red_light_counter = 0
             self.red_light_detected = True
@@ -409,74 +406,77 @@ class VideoApp:
                 license_plate_crop = self.vehicles_info[car_id]['license_crop']
                 license_bbox = self.vehicles_info[car_id].get('current_license_bbox', None)
                 license_detect = self.vehicles_info[car_id]['detect_license']
-                if license_detect:
-                    if license_plate_text is not None:
-                        color=(0, 255, 0) 
+                # if license_detect:
+                if license_plate_text is not None:
+                    color=(0, 255, 0) 
                         # Kiểm tra hướng di chuyển của xe
-                        if self.vehicles_info[car_id]['direction'] is None:
+                    if self.vehicles_info[car_id]['direction'] is None:
                             if y2 < left_line_y1 and y2 < left_line_y2:
                                 self.vehicles_info[car_id]['direction'] = 'backward'
                             elif y2 > left_line_y1 and y2 > left_line_y2:
                                 self.vehicles_info[car_id]['direction'] = 'forward'
 
                         # Kiểm tra vi phạm đèn đỏ
-                        if self.vehicles_info[car_id]['direction'] == 'forward':
+                    if self.vehicles_info[car_id]['direction'] == 'forward':
                             if y2 < left_line_y1 and y2 < left_line_y2 and self.vehicles_info[car_id]['crossed_stop_line'] == False:
                                 self.vehicles_info[car_id]['crossed_stop_line'] = True
                                 if self.red_light_detected:
                                     self.vehicles_info[car_id]['violation'] = True
 
-                        if self.right_coords and self.right_draw_enabled:
+                    if self.right_coords and self.right_draw_enabled:
                             if x2 > right_line_x1 and x2 > right_line_x2 and self.vehicles_info[car_id]['violation']==True:
                                 color=(0, 255, 0)       
                                 self.vehicles_info[car_id]['violation']=False
                                 if car_id in self.list_violation:
                                     self.remove_violation(car_id)
 
-                        if self.vehicles_info[car_id]['violation']:
+                    if self.vehicles_info[car_id]['violation']:
                             if car_id not in self.list_violation:
-                                self.save_violation_info(car_id, license_plate_crop, self.red_light_bbox, license_plate_text, (x1,y1,x2,y2))
+                                self.save_violation_info(car_id, license_plate_crop
+                                                         , self.red_light_bbox, license_plate_text, (x1,y1,x2,y2))
                                 self.list_violation.add(car_id)
                             color = (0, 0, 255)
                                                    
-                        draw_border(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 4,
+                    draw_border(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 4,
                                             line_length_x=50, line_length_y=50)                        
-                        if license_bbox:
+                    if license_detect:
                             # Use license plate bounding box
                             lx1, ly1, lx2, ly2 = license_bbox
                             H, W, _ = license_plate_crop.shape
 
                             if (
-                                0 <= int(ly1) - H < frame.shape[0] and
-                                0 <= int(ly1) < frame.shape[0] and
-                                0 <= int((lx2 + lx1 - W) / 2) < frame.shape[1] and
-                                0 <= int((lx2 + lx1 + W) / 2) < frame.shape[1]
+                                0 < int(ly1) - H < frame.shape[0] and
+                                0 < int(ly1) < frame.shape[0] and
+                                0 < int((lx2 + lx1 - W) / 2) < frame.shape[1] and
+                                0 < int((lx2 + lx1 + W) / 2) < frame.shape[1]
+                                
                             ):
+                                
                                 frame[int(ly1) - H:int(ly1), int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = license_plate_crop
                                 frame[int(ly1) - int(1.5 * H):int(ly1) - H, int((lx2 + lx1 - W) / 2):int((lx2 + lx1 + W) / 2), :] = (255, 255, 255)
 
                             (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
                             text_x = int((lx2 + lx1 - text_width) / 2)
                             text_y = int(ly1 - H - H / 8 - (text_height / 2))
-                        else:
+                    else:
                             # Use vehicle bounding box
                             H, W, _ = license_plate_crop.shape
 
                             if (
-                                0 <= int(y1) - H < frame.shape[0] and
-                                0 <= int(y1) < frame.shape[0] and
-                                0 <= int((x2 + x1 - W) / 2) < frame.shape[1] and
-                                0 <= int((x2 + x1 + W) / 2) < frame.shape[1]
+                                0 < int(y1)+int(0.5 * H) < frame.shape[0] and
+                                0 < int(y1)+int(1.5 * H) < frame.shape[0] and
+                                0 < int((x2 + x1 - W) / 2) < frame.shape[1] and
+                                0 < int((x2 + x1 + W) / 2) < frame.shape[1]
                             ):
-                                frame[int(y1) - H:int(y1), int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = license_plate_crop
-                                frame[int(y1) - int(1.5 * H):int(y1) - H, int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = (255, 255, 255)
+                                frame[int(y1)+int(0.5 * H) :int(y1)+int(1.5 * H), int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = license_plate_crop
+                                frame[int(y1) :int(y1)+int(0.5 * H) , int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = (255, 255, 255)
 
                             (text_width, text_height), _ = cv2.getTextSize(license_plate_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
                             text_x = int((x2 + x1 - text_width) / 2)
-                            text_y = int(y1 - H - H / 8 - (text_height / 2))
+                            text_y = int(y1  + H / 8 + (text_height / 2))
 
                         # Put the text on the frame
-                        cv2.putText(frame, license_plate_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 4)
+                    cv2.putText(frame, license_plate_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 4)
 
 
         # Display the frame with annotations
